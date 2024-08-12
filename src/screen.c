@@ -142,6 +142,7 @@ int       rflag;
 int       dflag;
 int       queryflag = -1;
 bool      hastruecolor = false;
+//int       maxlay;
 
 char     *multi;
 int       multiattach;

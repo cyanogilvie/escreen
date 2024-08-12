@@ -1966,7 +1966,7 @@ static void DoCommandScreen(struct action *act)
 {
 	char **args = act->args;
 
-	DoScreen("key", args);
+	OutputMsg(0, "New window: %d", DoScreen("key", args));
 }
 
 
@@ -4424,17 +4424,21 @@ static void DoCommandFocusminsize(struct action *act)
 		else
 			focusminheight = n;
 	}
-	if (msgok) {
-		char b[2][20];
-		for (int i = 0; i < 2; i++) {
-			n = i == 0 ? focusminwidth : focusminheight;
-			if (n == -1)
-				strncpy(b[i], "max", 20);
-			else
-				sprintf(b[i], "%d", n);
-		}
-		OutputMsg(0, "focus min size is %s %s\n", b[0], b[1]);
+
+	char b[2][20];
+	for (int i = 0; i < 2; i++) {
+		n = i == 0 ? focusminwidth : focusminheight;
+		if (n == -1)
+			strncpy(b[i], "max", 20);
+		else
+			sprintf(b[i], "%d", n);
 	}
+	if (D_layout) {
+		D_layout->lay_focusminwidth = focusminwidth;
+		D_layout->lay_focusminheight = focusminheight;
+	}
+	OutputMsg(0, "focus min size is %s %s\n", b[0], b[1]);
+	if (!msgok) {}; //Ops!
 }
 
 static void DoCommandGroup(struct action *act)
@@ -4453,13 +4457,11 @@ static void DoCommandGroup(struct action *act)
 		WindowChanged(NULL, WINESC_WIN_NAMES_NOCUR);
 		WindowChanged(NULL, 0);
 	}
-	if (msgok) {
-		if (fore->w_group)
-			OutputMsg(0, "window group is %d (%s)\n", fore->w_group->w_number,
-				  fore->w_group->w_title);
-		else
-			OutputMsg(0, "window belongs to no group");
-	}
+	if (fore->w_group)
+		OutputMsg(0, "window group is %d (%s)\n", fore->w_group->w_number, fore->w_group->w_title);
+	else
+		OutputMsg(0, "window belongs to no group");
+	if (!msgok) {}; //Ops!
 }
 
 static void DoCommandLayout(struct action *act)
@@ -4561,6 +4563,10 @@ static void DoCommandLayout(struct action *act)
 		if (display)
 			SaveLayout(args[1], &D_canvas);
 	} else if (!strcmp(args[0], "select")) {
+		if (!laytab) {
+			OutputMsg(0, "not on a layout");
+			return;
+		}
 		if (!display) {
 			if (args[1])
 				layout_attach = FindLayout(args[1]);
@@ -4747,6 +4753,36 @@ void DoAction(struct action *act)
 	case RC_DUMPTERMCAP:
 		DoCommandDumptermcap(act);
 		break;
+	case RC_DUMPSCREEN:
+		{
+			struct acluser *user = display ? D_user : users;
+			if (args[0] && !strcmp(args[0], "window"))
+				WriteFile(user, args[1] ? args[1] : "dumpscreen-window" , DUMP_SCSWINDOW);
+			else if (args[0] && !strcmp(args[0], "window-full"))
+				WriteFile(user, args[1] ? args[1] : "dumpscreen-window-full", DUMP_SCSWINDOWFULL);
+			else if (args[0] && !strcmp(args[0], "layout")) {
+				if (!display || !D_layout)
+					OutputMsg(0, "Must have a display and a layout for 'dumpscreen layout'.");
+				else if (!LayoutDumpCanvasScs(&D_canvas, args[1] ? args[1] : "layout-regions"))
+					OutputMsg(errno, "Error dumping layout regions");
+				else
+					OutputMsg(0, "Layout dumped to \"%s\"", args[1] ? args[1] : "layout-regions");
+			} else if (args[0] && !strcmp(args[0], "layout-info")) {
+				if (!display || !D_layout)
+					OutputMsg(0, "Must have a display and a layout for 'dumpscreen layoutinfo'.");
+				else if (!DumpLayoutsInfoScs(args[1] ? args[1] : "layout-info"))
+					OutputMsg(errno, "Error dumping layout info");
+				else
+					OutputMsg(0, "Layout info dumped to \"%s\"", args[1] ? args[1] : "layout-info");
+			} else if (args[0] && args[1] && !strcmp(args[0], "history")) {
+				if (!dump_history(args[1]))
+					OutputMsg(errno, "Error dumping history ");
+				else
+					OutputMsg(0, "history dumped to \"%s\"", args[1]); 
+			} else
+				OutputMsg(0, "Usage: dumpscreen [ window | window-full | layout | layout-info | history ] filename");
+			break;
+		}
 	case RC_HARDCOPY:
 		DoCommandHardcopy(act);
 		break;
@@ -4963,6 +4999,17 @@ void DoAction(struct action *act)
 		break;
 	case RC_TERM:
 		DoCommandTerm(act);
+		break;
+	case RC_TTY:
+		if(fore) { 
+			if (fore->w_type == W_TYPE_TELNET)
+				OutputMsg(0, "telnet");
+			else if (fore->w_type == W_TYPE_GROUP)
+				OutputMsg(0, "group");
+			else
+				OutputMsg(0, "%s", fore->w_tty);
+		} else
+			OutputMsg(0, "none");
 		break;
 	case RC_ECHO:
 		DoCommandEcho(act);
@@ -5239,6 +5286,22 @@ void DoAction(struct action *act)
 		break;
 	case RC_ALTSCREEN:
 		DoCommandAltscreen(act);
+		break;
+	case RC_MAXLAY:
+		if (!args[0]) {
+			OutputMsg(0, "maximum layouts allowed: %d", maxlay);
+			break;
+		}
+		if (ParseNum(act, &n))
+			break;
+		if (n < 1)
+			OutputMsg(0, "illegal maxlay number specified");
+		else if (n > 2048)
+			OutputMsg(0, "maximum 2048 layouts allowed");
+		else if (n > maxlay && laytab)
+			OutputMsg(0, "may increase maxlay only when there's no layout");
+		else
+			maxlay = n;
 		break;
 	case RC_AUTH:
 		DoCommandAuth(act);
@@ -6488,7 +6551,7 @@ static void InputSetenv(char *arg)
  * -ln, -l0, -ly, -l1, -l
  * -a, -M, -L
  */
-void DoScreen(char *fn, char **av)
+int DoScreen(char *fn, char **av)
 {
 	struct NewWindow nwin;
 	int num;
@@ -6594,7 +6657,7 @@ void DoScreen(char *fn, char **av)
 		if (!nwin.aka)
 			nwin.aka = Filename(*av);
 	}
-	MakeWindow(&nwin);
+	return MakeWindow(&nwin);
 }
 
 /*

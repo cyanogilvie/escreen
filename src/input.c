@@ -147,6 +147,27 @@ void Input(char *istr, size_t len, int mode, void (*finfunc) (char *buf, size_t 
 		inp_setprompt(istr, (char *)NULL);
 }
 
+int dump_history(char *filename)
+{
+	struct inpline *inp;
+	inp = inphist.prev;
+	char *b=NULL;
+	FILE *f = NULL;
+	if (f = secfopen(filename,"w")) {
+		if (inp->prev) {
+			inp = inp->prev;
+			while (inp) {
+				b=SaveStr((char *)inp);
+				fprintf(f,"%s\n",b);
+				inp = inp->prev;
+			}
+		}
+		fclose(f);
+		return 1;
+	} else
+		return 0;
+}
+
 static void erase_chars(struct inpdata *inpdata, char *from, char *to, int x, int mv)
 {
 	int chng;

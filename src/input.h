@@ -5,6 +5,7 @@
 
 void  inp_setprompt (char *, char *);
 void  Input (char *, size_t, int, void (*)(char *, size_t, void *), char *, int);
+int   dump_history __P((char *));
 int   InInput (void);
 
 #endif /* SCREEN_INPUT_H */

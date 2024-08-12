@@ -43,6 +43,8 @@ struct Layout {
 	Canvas          *lay_forecv;
 	Canvas 	        *lay_cvlist;
 	int              lay_autosave;
+	int              lay_focusminwidth;
+	int              lay_focusminheight;
 };
 
 void  FreeLayoutCv(Canvas *c);
@@ -57,6 +59,8 @@ void  UpdateLayoutCanvas (Canvas *, Window *);
 Layout *CreateLayout (char *, int);
 void  RemoveLayout (Layout *);
 int   LayoutDumpCanvas (Canvas *, char *);
+int   LayoutDumpCanvasScs (Canvas *, char *);
+int   DumpLayoutsInfoScs(char *filename);
 
 void RenameLayout (Layout *, const char *);
 int RenumberLayout (Layout *, int);
@@ -65,5 +69,8 @@ int RenumberLayout (Layout *, int);
 
 extern Layout *layout_attach, *layout_last, layout_last_marker;
 extern Layout *layouts;
+extern Layout **laytab;
+
+extern int maxlay;
 
 #endif /* SCREEN_LAYOUT_H */
