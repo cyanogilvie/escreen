@@ -1,4 +1,4 @@
-AC_INIT([GNU Screen],[5.0.0],[https://savannah.gnu.org/bugs/?group=screen],[screen],[https://www.gnu.org/software/screen/])
+AC_INIT([GNU Screen (with escreen modifications)],[5.0.0],[https://github.com/cyanogilvie/screen-session/issues],[screen],[https://github.com/cyanogilvie/escreen/])
 AC_PREREQ([2.71])
 
 AC_CONFIG_HEADERS([config.h])
